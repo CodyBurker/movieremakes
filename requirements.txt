@@ -1,4 +1,4 @@
 pandas
 wikipedia
 lxml
-BeautifulSoup
+polars
