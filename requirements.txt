@@ -3,3 +3,4 @@ lxml
 polars
 aiohttp
 tqdm
+plotly
