@@ -1,4 +1,5 @@
 pandas
-wikipedia
 lxml
 polars
+aiohttp
+tqdm
