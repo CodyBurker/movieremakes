@@ -1,0 +1,139 @@
+---
+title: "Difference between notebook and markdown?"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+movies = read_csv('data/processed/movie_data.csv',show_col_types = FALSE) %>%
+  mutate(
+    release_year = floor_date(release_date,'year'),
+    release_month = floor_date(release_date,'month')
+  )
+sequels_yearly <- movies %>%
+    group_by(release_year, sequel) %>%
+    summarise(count = n()) %>%
+  pivot_wider(names_from=sequel, values_from = count) %>%
+  rename(
+    sequel = 'TRUE',
+    original = 'FALSE'
+  ) %>%
+  mutate(
+    pct_sequel = sequel / (sequel + original)
+  ) %>%
+  mutate(
+    sequel = replace_na(sequel,0),
+    pct_sequel = replace_na(pct_sequel,0)
+  )
+
+remakes_yearly <- movies %>%
+    group_by(release_year, remake) %>%
+    summarise(count = n()) %>%
+  pivot_wider(names_from=remake, values_from = count) %>%
+  rename(
+    remake = 'TRUE',
+    original = 'FALSE'
+  ) %>%
+  mutate(
+    pct_remake = remake / (remake + original)
+  ) %>%
+  mutate(
+    remake = replace_na(remake,0),
+    pct_remake = replace_na(pct_remake,0)
+  )
+  
+
+remakes_yearly
+```
+```{r}
+seqs <- movies %>% filter(remake | sequel, release_year >= '2022-01-01', release_year < '2023-01-01', sequel) %>% count()
+rems <- movies %>% filter(remake | sequel, release_year >= '2022-01-01', release_year < '2023-01-01', remake) %>% count()
+total <- movies %>%  filter( release_year >= '2022-01-01',release_year <= '2023-01-01') %>% count()
+
+print(100 * (seqs/total))
+print(100 * (rems/total))
+
+print(total)
+print(seqs)
+print(rems)
+```
+
+```{r}
+coord_y_datetime <- function(xlim = NULL, ylim = NULL, expand = TRUE) {
+  if (!is.null(ylim)) {
+    ylim <- lubridate::as_datetime(ylim)
+  }
+  ggplot2::coord_cartesian(xlim = xlim, ylim = ylim, expand = expand)
+}
+```
+
+```{r}
+abs_pct <- function(x){
+  scales::percent_format(accuracy = .1)(abs(x))
+}
+```
+```{r}
+reverse2_trans <- function() {
+  trans_new(
+    "reverse2",
+    function(x) -1 * as.numeric(x), # Force values to be numeric for Date objects
+    function(x) -1 * as.numeric(x)
+  )
+}
+```
+
+```{r}
+remakes_graph <- remakes_yearly %>%
+  ggplot() + 
+  geom_col(aes(x = release_year, y = pct_remake)) 
+
+seq_graph <- sequels_yearly %>%
+  ggplot() + 
+  geom_col(aes(x = release_year, y = pct_sequel)) 
+
+
+together <-  ggplot() + 
+  geom_col(
+    data = sequels_yearly,
+    aes(x = release_year, y = pct_sequel, fill = 'red')
+)  + 
+  geom_col(
+    data = remakes_yearly %>% mutate(pct_remake = -1 * pct_remake), 
+    aes(x = release_year, y = pct_remake , fill = 'blue')
+  ) + coord_flip(
+    
+  ) +  scale_y_continuous(
+    labels =abs_pct,
+    limits = c(-.2,.2)
+  ) + scale_fill_discrete(
+    name='Remake Type' ,
+    breaks = c('red','blue'),
+    labels = c('Remake','Sequel')
+) + scale_x_continuous(
+  trans =  c("date", "reverse2"), labels = scales::label_date_short()
+) + labs(
+  x='Year', y = "Percent of Released Movies"
+) 
+
+together
+```
+```{r}
+total_movies <- movies %>% group_by(release_year) %>% summarise(count = n()) %>% na.omit() %>%
+  ggplot() + 
+  geom_col(aes(x=release_year, y = count)) + 
+  geom_smooth(aes(x=release_year, y = count), method = loess, formula = y~x) + 
+  coord_flip()+ scale_x_continuous(
+  trans =  c("date", "reverse2"), labels = scales::label_date_short()
+) + labs(
+  x='Year', y = "Total Movies"
+) 
+total_movies
+```
+
+```{r}
+library(ggpubr)
+```
+
